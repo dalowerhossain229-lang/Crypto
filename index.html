@@ -1,1 +1,186 @@
-i 
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crypto MLM Dashboard - Trial</title>
+    <!-- Tailwind CSS CDN for Styling -->
+    <script src="https://tailwindcss.com"></script>
+    <!-- Socket.io Client CDN -->
+    <script src="https://socket.io"></script>
+</head>
+<body class="bg-gray-900 text-gray-100 font-sans">
+
+    <!-- Navbar -->
+    <nav class="bg-gray-800 p-4 border-b border-gray-700 flex justify-between items-center shadow-lg">
+        <h1 class="text-xl font-bold text-teal-400 tracking-wide">CryptoNet <span class="text-xs bg-gray-700 text-gray-300 px-2 py-1 rounded">Trial v1.0</span></h1>
+        <button id="connectWalletBtn" class="bg-teal-500 hover:bg-teal-600 text-gray-900 font-semibold px-4 py-2 rounded-lg transition-all duration-300 shadow-md">
+            Connect Wallet
+        </button>
+    </nav>
+
+    <!-- Main Container -->
+    <main class="max-w-6xl mx-auto p-4 md:p-8">
+        
+        <!-- Wallet Address Alert -->
+        <p id="walletAddress" class="text-sm text-gray-400 text-center mb-6 break-all bg-gray-800 p-2 rounded hidden border border-gray-700"></p>
+
+        <!-- Stats Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <!-- Stat 1 -->
+            <div class="bg-gray-800 p-6 rounded-xl border border-gray-700 shadow-md">
+                <p class="text-gray-400 text-sm font-medium uppercase">My Total Balance</p>
+                <p class="text-3xl font-extrabold text-teal-400 mt-2"><span id="balanceText">0.00</span> USDT</p>
+            </div>
+            <!-- Stat 2 -->
+            <div class="bg-gray-800 p-6 rounded-xl border border-gray-700 shadow-md">
+                <p class="text-gray-400 text-sm font-medium uppercase">Direct Referrals</p>
+                <p class="text-3xl font-extrabold text-purple-400 mt-2"><span id="referralCount">0</span> Users</p>
+            </div>
+            <!-- Stat 3 -->
+            <div class="bg-gray-800 p-6 rounded-xl border border-gray-700 shadow-md">
+                <p class="text-gray-400 text-sm font-medium uppercase">System Status</p>
+                <p id="serverStatus" class="text-xl font-semibold text-red-400 mt-3 flex items-center gap-2">
+                    <span class="h-3 w-3 rounded-full bg-red-500 animate-pulse"></span> Offline
+                </p>
+            </div>
+        </div>
+
+        <!-- Interactive Section -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            
+            <!-- Left Side: Registration Simulating Form -->
+            <div class="bg-gray-800 p-6 rounded-xl border border-gray-700 shadow-md">
+                <h2 class="text-lg font-bold text-gray-200 mb-4 border-b border-gray-700 pb-2">Simulate New Join (Downline)</h2>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-1">Referral Wallet Address</label>
+                        <input id="refInput" type="text" placeholder="Enter upline address..." class="w-full bg-gray-900 border border-gray-700 rounded-lg p-3 text-gray-200 focus:outline-none focus:border-teal-500 transition">
+                    </div>
+                    <button id="joinBtn" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold p-3 rounded-lg transition-all duration-300">
+                        Join Network (Simulate Payout)
+                    </button>
+                </div>
+            </div>
+
+            <!-- Right Side: Real-time Live Logs (Socket.io) -->
+            <div class="bg-gray-800 p-6 rounded-xl border border-gray-700 shadow-md flex flex-col h-[300px]">
+                <h2 class="text-lg font-bold text-gray-200 mb-4 border-b border-gray-700 pb-2 flex justify-between items-center">
+                    <span>Live Network Activity</span>
+                    <span class="text-xs text-gray-500">Real-time (Socket.io)</span>
+                </h2>
+                <div id="logContainer" class="flex-1 overflow-y-auto space-y-2 text-sm font-mono text-gray-300 pr-2">
+                    <p class="text-gray-500 italic">Waiting for activity logs...</p>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- JavaScript Logic -->
+    <script>
+        // --- CONFIGURATION ---
+        // Render-এ ব্যাকএন্ড ডেপ্লয় করার পর নিচের URL-টি আপনার রেন্ডার URL দিয়ে পরিবর্তন করবেন।
+        const SERVER_URL = "http://localhost:5000"; 
+
+        // --- SOCKET.IO INTEGRATION ---
+        const socket = io(SERVER_URL, { autoConnect: false });
+
+        const serverStatus = document.getElementById('serverStatus');
+        const logContainer = document.getElementById('logContainer');
+
+        // Connect to Socket Server
+        socket.connect();
+
+        socket.on('connect', () => {
+            serverStatus.innerHTML = '<span class="h-3 w-3 rounded-full bg-green-500 animate-pulse"></span> Online';
+            serverStatus.className = "text-xl font-semibold text-green-400 mt-3 flex items-center gap-2";
+            addLog("Connected to real-time notification server.");
+        });
+
+        socket.on('disconnect', () => {
+            serverStatus.innerHTML = '<span class="h-3 w-3 rounded-full bg-red-500"></span> Offline';
+            serverStatus.className = "text-xl font-semibold text-red-400 mt-3 flex items-center gap-2";
+            addLog("Disconnected from server.");
+        });
+
+        // Listen for live matrix updates from Backend
+        socket.on('new_member_joined', (data) => {
+            addLog(`⚡ New user joined under ref: ${data.ref.substring(0,6)}...`);
+            
+            // Real-time ড্যাশবোর্ড আপডেট (যদি কারেন্ট ইউজারের অ্যাড্রেস ম্যাচ করে)
+            let currentWallet = document.getElementById('walletAddress').innerText;
+            if(currentWallet.includes(data.ref)) {
+                let currentCount = parseInt(document.getElementById('referralCount').innerText);
+                document.getElementById('referralCount').innerText = currentCount + 1;
+                
+                let currentBalance = parseFloat(document.getElementById('balanceText').innerText);
+                document.getElementById('balanceText').innerText = (currentBalance + 10.00).toFixed(2); // ডেমো ১০ ডলার কমিশন
+                addLog(`🎉 You received 10 USDT referral commission!`);
+            }
+        });
+
+        // Helper function to show live logs
+        function addLog(message) {
+            const time = new Date().toLocaleTimeString();
+            const logItem = document.createElement('p');
+            logItem.className = "border-l-2 border-teal-500 pl-2 bg-gray-900 p-1.5 rounded";
+            logItem.innerHTML = `<span class="text-teal-500">[${time}]</span> ${message}`;
+            
+            // Clear placeholder text on first log
+            if(logContainer.querySelector('p.italic')) {
+                logContainer.innerHTML = '';
+            }
+            
+            logContainer.appendChild(logItem);
+            logContainer.scrollTop = logContainer.scrollHeight; // Auto-scroll to bottom
+        }
+
+        // --- WEB3 / METAMASK INTEGRATION ---
+        const connectWalletBtn = document.getElementById('connectWalletBtn');
+        const walletAddressAlert = document.getElementById('walletAddress');
+
+        connectWalletBtn.addEventListener('click', async () => {
+            if (typeof window.ethereum !== 'undefined') {
+                try {
+                    // Request wallet connection
+                    const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+                    const walletId = accounts[0];
+                    
+                    // UI Update
+                    connectWalletBtn.innerText = "Wallet Connected";
+                    connectWalletBtn.className = "bg-green-500 text-gray-900 font-semibold px-4 py-2 rounded-lg cursor-not-allowed";
+                    connectWalletBtn.disabled = true;
+
+                    walletAddressAlert.innerText = `Connected Wallet ID: ${walletId}`;
+                    walletAddressAlert.classList.remove('hidden');
+                    
+                    addLog(`Wallet successfully connected: ${walletId.substring(0, 6)}...${walletId.substring(walletId.length - 4)}`);
+                    
+                    // সকেট সার্ভারে ইউজারকে রেজিস্টার করা
+                    socket.emit('register_user', { walletAddress: walletId });
+
+                } catch (error) {
+                    console.error(error);
+                    alert("Wallet connection failed.");
+                }
+            } else {
+                alert("MetaMask detected নয়! দয়া করে MetaMask এক্সটেনশন ইনস্টল করুন।");
+            }
+        });
+
+        // --- SIMULATE PUSHING DATA TO BACKEND ---
+        document.getElementById('joinBtn').addEventListener('click', () => {
+            const refAddress = document.getElementById('refInput').value.trim();
+            if(!refAddress) {
+                alert("দয়া করে একজন আপলাইনের রেফারেল অ্যাড্রেস দিন!");
+                return;
+            }
+            
+            // সার্ভারে ডাটা পাঠানো (সকেটের মাধ্যমে টেস্ট করার জন্য)
+            socket.emit('simulate_join', { ref: refAddress });
+            document.getElementById('refInput').value = ''; // Input clear
+        });
+    </script>
+</body>
+</html>
